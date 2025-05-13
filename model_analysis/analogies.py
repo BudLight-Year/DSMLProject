@@ -1,11 +1,19 @@
 """
 Analogy Test Script for Word2Vec models
 
-This script evaluates a trained Word2Vec model's ability to solve word analogies.
-It supports both built-in test sets and custom analogy pairs.
+This script evaluates how well a trained Word2Vec model can solve word analogies, which is a common
+way to test the quality of word embeddings. The script uses pre-defined analogy test sets covering
+various semantic and syntactic relationships.
+
+Features:
+- Evaluates model performance on different analogy categories
+- Detailed metrics including accuracy, mean/median rank of expected words
+- Export results to CSV for further analysis
+- Select specific categories to test from the default sets
+- Verbose output option for detailed per-analogy results
 
 Usage:
-    python word2vec_analogy_test.py --model model_path.model [--test-file custom_analogies.txt] [--verbose]
+    python word2vec_analogy_test.py --model model_path.model [--verbose] [--categories gender past-tense] [--output results.csv]
 
 Some code in this module was adapted from code provided by Claude (Anthropic).
 """
@@ -94,61 +102,6 @@ def load_model(model_path):
     except Exception as e:
         print(f"Error loading model: {e}")
         return None
-
-
-def load_custom_analogies(file_path):
-    """
-    Load custom analogy test set from a text or CSV file.
-
-    Expected format:
-    - CSV: word1,word2,word3,word4,category(optional)
-    - TXT: word1 word2 word3 word4 [category]
-    """
-    analogies = {}
-
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Analogy file not found: {file_path}")
-
-    try:
-        # Determine file type and load accordingly
-        ext = os.path.splitext(file_path)[1].lower()
-
-        if ext == '.csv':
-            with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
-                for row in reader:
-                    if len(row) < 4:
-                        continue
-
-                    category = row[4] if len(row) > 4 else "custom"
-                    if category not in analogies:
-                        analogies[category] = []
-
-                    analogies[category].append(
-                        (row[0], row[1], row[2], row[3]))
-        else:  # Default to text file
-            with open(file_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip() and not line.startswith('#'):
-                        parts = line.strip().split()
-                        if len(parts) < 4:
-                            continue
-
-                        category = ' '.join(parts[4:]) if len(
-                            parts) > 4 else "custom"
-                        if category not in analogies:
-                            analogies[category] = []
-
-                        analogies[category].append(
-                            (parts[0], parts[1], parts[2], parts[3]))
-
-        print(
-            f"Loaded {sum(len(v) for v in analogies.values())} custom analogies from {file_path}")
-        return analogies
-
-    except Exception as e:
-        print(f"Error loading custom analogies: {e}")
-        return {}
 
 
 def evaluate_analogy(model, word1, word2, word3, expected_word4, verbose=False):
@@ -271,8 +224,7 @@ def run_analogy_tests(model, analogy_sets, verbose=False):
 
         print(f"\nResults for category '{category}':")
         print(f"Total analogies: {category_results['total']}")
-        print(
-            f"Analogies with all words in vocabulary: {category_results['in_vocab']}")
+        print(f"Analogies with all words in vocabulary: {category_results['in_vocab']}")
         print(f"Successful predictions: {category_results['successful']}")
         print(f"Accuracy (vocab): {in_vocab_accuracy:.2%}")
         print(f"Accuracy (total): {total_accuracy:.2%}")
@@ -348,55 +300,7 @@ def export_results(results, output_file):
     print(f"\nResults exported to {output_file}")
 
 
-def interactive_mode(model):
-    """Interactive mode for testing analogies manually."""
-    print("\n=== Interactive Analogy Testing ===")
-    print("Enter analogies in the format: word1 word2 word3")
-    print("Type 'exit' to quit")
 
-    while True:
-        try:
-            user_input = input("\nEnter analogy > ").strip()
-
-            if user_input.lower() in ('exit', 'quit', 'q'):
-                break
-
-            parts = user_input.split()
-            if len(parts) != 3:
-                print("Please enter exactly 3 words in the format: word1 word2 word3")
-                continue
-
-            word1, word2, word3 = parts
-
-            # Check vocabulary
-            missing_words = []
-            for word in [word1, word2, word3]:
-                if word not in model.wv:
-                    missing_words.append(word)
-
-            if missing_words:
-                print(
-                    f"Warning: The following words are not in the vocabulary: {', '.join(missing_words)}")
-                continue
-
-            # Get predictions
-            try:
-                results = model.wv.most_similar(
-                    positive=[word2, word3], negative=[word1], topn=10)
-
-                print(f"\n{word1} is to {word2} as {word3} is to:")
-                for i, (word, score) in enumerate(results):
-                    print(f"{i+1}. {word} (similarity: {score:.4f})")
-
-            except Exception as e:
-                print(f"Error: {e}")
-
-        except KeyboardInterrupt:
-            break
-        except Exception as e:
-            print(f"Error: {e}")
-
-    print("Exiting interactive mode")
 
 
 def main():
@@ -404,14 +308,11 @@ def main():
         description='Evaluate a Word2Vec model on analogy tasks')
     parser.add_argument('--model', '-m', required=True,
                         help='Path to the trained Word2Vec model')
-    parser.add_argument(
-        '--test-file', '-t', help='Path to a custom analogies test file (CSV or TXT)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Show detailed results for each analogy')
     parser.add_argument(
         '--output', '-o', default='analogy_results.csv', help='Output file for results')
-    parser.add_argument('--interactive', '-i',
-                        action='store_true', help='Run in interactive mode')
+
     parser.add_argument('--categories', '-c', nargs='+',
                         help='Specific categories to test from the default set')
 
@@ -421,10 +322,7 @@ def main():
     if model is None:
         return
 
-    # Interactive mode
-    if args.interactive:
-        interactive_mode(model.wv)
-        return
+
 
     test_sets = {}
 
@@ -437,11 +335,6 @@ def main():
                     f"Warning: Category '{category}' not found in default analogies")
     else:
         test_sets = DEFAULT_ANALOGIES.copy()
-
-    # Load custom test set if provided
-    if args.test_file:
-        custom_sets = load_custom_analogies(args.test_file)
-        test_sets.update(custom_sets)
 
     # Run tests
     results = run_analogy_tests(model, test_sets, args.verbose)

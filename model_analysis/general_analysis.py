@@ -11,10 +11,9 @@ Key Functionality:
 3. Analyzing semantic shift of specific words through time
 4. Comparing word contexts across different periods
 5. Visualizing semantic spaces using dimensionality reduction (t-SNE or PCA)
-6. Calculating vector distances to quantify semantic change
-7. Identifying words with the largest semantic shifts between periods
-8. Comparing word-context relationships across time periods
-9. Generating visualizations and saving analysis results
+6. Identifying words with the largest semantic shifts between periods
+7. Comparing word-context relationships across time periods
+8. Saving analysis results
 
 Command-line arguments allow for customization of input models, word lists,
 context pairs, and output settings.
@@ -264,56 +263,6 @@ def visualize_semantic_space(models, words, output_dir=None, method='tsne'):
             plt.show()
 
 
-def compare_word_vectors(models, words):
-    """
-    Compare word vectors across time periods by calculating cosine distances
-
-    Args:
-        models (dict): Dictionary of loaded models
-        words (list): List of words to compare
-
-    Returns:
-        dict: Dictionary with vector comparisons
-    """
-    results = {}
-    periods = list(models.keys())
-
-    for word in words:
-        print(f"\nVector comparison for '{word}':")
-
-        # Check if word exists in all models
-        exists_in_all = all(word in model.wv for model in models.values())
-        if not exists_in_all:
-            print(f"  '{word}' does not exist in all time periods")
-            missing_in = [period for period,
-                          model in models.items() if word not in model.wv]
-            print(f"  Missing in: {', '.join(missing_in)}")
-            continue
-
-        vectors = {period: models[period].wv[word] for period in periods}
-
-        # Compare vectors between all period pairs
-        comparisons = {}
-        for i, period1 in enumerate(periods):
-            for period2 in periods[i+1:]:
-                vec1 = vectors[period1]
-                vec2 = vectors[period2]
-
-                # Calculate cosine similarity (dot product of normalized vectors)
-                similarity = np.dot(vec1, vec2) / \
-                    (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-
-                distance = 1 - similarity
-
-                comparisons[(period1, period2)] = distance
-                print(
-                    f"  Distance between {period1} and {period2}: {distance:.4f}")
-
-        results[word] = comparisons
-
-    return results
-
-
 def top_changed_words(models, num_words=100, min_freq=50):
     """
     Find words with the largest semantic shift between time periods
@@ -444,7 +393,6 @@ if __name__ == "__main__":
     # Perform analyses
     semantic_results = semantic_shift(models, args.words)
     context_results = contextual_comparison(models, context_pairs)
-    vector_comparisons = compare_word_vectors(models, args.words)
 
     # Find top changed words and save
     if len(models) == 2:
