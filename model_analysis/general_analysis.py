@@ -267,6 +267,10 @@ def top_changed_words(models, num_words=100, min_freq=50):
     """
     Find words with the largest semantic shift between time periods
 
+    This function is currently ineffective since it requires some
+    sort of vector space alignment between models. The current results
+    are heavily influenced by the random initialization of the model.
+
     Args:
         models (dict): Dictionary of loaded models
         num_words (int): Number of top changed words to return
